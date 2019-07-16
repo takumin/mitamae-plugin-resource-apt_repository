@@ -3,7 +3,6 @@ module ::MItamae
     module ResourceExecutor
       class AptRepository < ::MItamae::ResourceExecutor::File
         ParsePlatformError = Class.new(StandardError)
-        TemplateNotFoundError = Class.new(StandardError)
 
         private
 
@@ -14,26 +13,10 @@ module ::MItamae
 
           case action
           when :create
-            desired.content = RenderContext.new(attributes).render_file(template_path)
+            desired.content = RenderContext.new(attributes).render_file()
           end
 
           super
-        end
-
-        def template_path
-          fragment_path = [
-            'plugins',
-            'mitamae-plugin-resource-' + self.class.to_s.split('::').last.gsub(/([a-z\d])([A-Z])/, '\1_\2').downcase,
-            'mrblib',
-            'template',
-            'apt.list.erb',
-          ]
-
-          unless File.exists?(fragment_path.join('/'))
-            raise TemplateNotFoundError, "template file not found (file path: #{fragment_path.join('/')})"
-          end
-
-          fragment_path.join('/')
         end
 
         def content_file
@@ -44,9 +27,11 @@ module ::MItamae
           def initialize(resource)
             @resource = resource
 
-            @repos         = {}
-            @repos[:name]  = resource.name
-            @repos[:entry] = []
+            @repos          = {}
+            @repos[:name]   = resource.name
+            @repos[:entry]  = []
+            @repos[:header] = ''
+            @repos[:footer] = ''
 
             @platform = {}
 
@@ -84,7 +69,7 @@ module ::MItamae
             end
           end
 
-          def render_file(src)
+          def render_file
             deb_padding = 3
             url_padding = 0
             suite_padding = 0
@@ -152,7 +137,27 @@ module ::MItamae
               end
             end
 
-            ERB.new(File.read(src), nil, '-').result(self)
+            content = ''
+            case @resource.header
+            when String
+              content << @resource.header + "\n"
+            when Array
+              content << @resource.header.join("\n") + "\n"
+            end
+            content << "#\n"
+            content << "# #{@repos[:name]}\n"
+            content << "#\n"
+            @repos[:entry].each do |repo|
+              content << repo
+            end
+            case @resource.footer
+            when String
+              content << @resource.footer + "\n"
+            when Array
+              content << @resource.footer.join("\n") + "\n"
+            end
+
+            return content
           end
         end
       end

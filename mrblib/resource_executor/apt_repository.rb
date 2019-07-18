@@ -148,7 +148,7 @@ module ::MItamae
             content << "# #{@repos[:name]}\n"
             content << "#\n"
             @repos[:entry].each do |repo|
-              content << repo
+              content << "#{repo}\n"
             end
             case @resource.footer
             when String

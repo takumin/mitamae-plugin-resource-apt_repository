@@ -79,7 +79,7 @@ module ::MItamae
                 deb_padding = 7
               end
 
-              if repo.mirror_uri.kind_of?(String) and repo.mirror_uri.match(/^https?:\/\//)
+              if repo.mirror_uri.kind_of?(String) and repo.mirror_uri.match(/^(?:file|https?):\/\//)
                 repo.uri = repo.mirror_uri
               else
                 repo.uri = repo.default_uri

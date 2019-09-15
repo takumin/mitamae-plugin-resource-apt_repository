@@ -26,13 +26,7 @@ module ::MItamae
         class RenderContext
           def initialize(resource)
             @resource = resource
-
-            @repos          = {}
-            @repos[:name]   = resource.name
-            @repos[:entry]  = []
-            @repos[:header] = ''
-            @repos[:footer] = ''
-
+            @entry    = []
             @platform = {}
 
             ::File.open('/etc/lsb-release').each do |line|
@@ -125,7 +119,7 @@ module ::MItamae
               deb << repo.uri.ljust(url_padding)
               deb << repo.suite.ljust(suite_padding)
               deb << components
-              @repos[:entry] << deb
+              @entry << deb
 
               if repo.source
                 deb = 'deb-src'.ljust(deb_padding)
@@ -133,7 +127,7 @@ module ::MItamae
                 deb << repo.uri.ljust(url_padding)
                 deb << repo.suite.ljust(suite_padding)
                 deb << components
-                @repos[:entry] << deb
+                @entry << deb
               end
             end
 
@@ -144,10 +138,7 @@ module ::MItamae
             when Array
               content << @resource.header.join("\n") + "\n"
             end
-            content << "#\n"
-            content << "# #{@repos[:name]}\n"
-            content << "#\n"
-            @repos[:entry].each do |repo|
+            @entry.each do |repo|
               content << "#{repo}\n"
             end
             case @resource.footer

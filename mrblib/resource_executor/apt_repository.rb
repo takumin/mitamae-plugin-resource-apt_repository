@@ -34,10 +34,10 @@ module ::MItamae
                 case line
                 when /^ID=([a-zA-Z]+)$/
                   @platform[:distrib]       ||= $1.downcase
-                when /^VERSION_ID=([0-9]+)\.([0-9]+)$/
+                when /^VERSION_ID="?([0-9]+)\.?([0-9]+)?"?$/
                   @platform[:release]       ||= "#{$1}.#{$2}"
                   @platform[:major_version] ||= $1
-                  @platform[:minor_version] ||= $2
+                  @platform[:minor_version] ||= $2 || "0"
                 when /^VERSION_CODENAME=([a-zA-Z]+)$/
                   @platform[:codename]      ||= $1.downcase
                 end

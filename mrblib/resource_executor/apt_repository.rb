@@ -29,16 +29,33 @@ module ::MItamae
             @entry    = []
             @platform = {}
 
-            ::File.open('/etc/lsb-release').each do |line|
-              case line
-              when /^DISTRIB_ID=([a-zA-Z]+)$/
-                @platform[:distrib] = $1.downcase
-              when /^DISTRIB_RELEASE=([0-9]+)\.([0-9]+)$/
-                @platform[:release]       ||= "#{$1}.#{$2}"
-                @platform[:major_version] ||= $1
-                @platform[:minor_version] ||= $2
-              when /^DISTRIB_CODENAME=([a-zA-Z]+)$/
-                @platform[:codename] = $1.downcase
+            if ::File.exist?('/etc/os-release')
+              ::File.open('/etc/os-release').each do |line|
+                case line
+                when /^ID=([a-zA-Z]+)$/
+                  @platform[:distrib]       ||= $1.downcase
+                when /^VERSION_ID=([0-9]+)\.([0-9]+)$/
+                  @platform[:release]       ||= "#{$1}.#{$2}"
+                  @platform[:major_version] ||= $1
+                  @platform[:minor_version] ||= $2
+                when /^VERSION_CODENAME=([a-zA-Z]+)$/
+                  @platform[:codename]      ||= $1.downcase
+                end
+              end
+            end
+
+            if ::File.exist?('/etc/lsb-release')
+              ::File.open('/etc/lsb-release').each do |line|
+                case line
+                when /^DISTRIB_ID=([a-zA-Z]+)$/
+                  @platform[:distrib]       ||= $1.downcase
+                when /^DISTRIB_RELEASE=([0-9]+)\.([0-9]+)$/
+                  @platform[:release]       ||= "#{$1}.#{$2}"
+                  @platform[:major_version] ||= $1
+                  @platform[:minor_version] ||= $2
+                when /^DISTRIB_CODENAME=([a-zA-Z]+)$/
+                  @platform[:codename]      ||= $1.downcase
+                end
               end
             end
 

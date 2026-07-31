@@ -7,6 +7,8 @@ module ::MItamae
         private
 
         def set_desired_attributes(desired, action)
+          validate_element_attributes
+
           desired.owner = 'root'
           desired.group = 'root'
           desired.mode  = '0644'
@@ -23,7 +25,52 @@ module ::MItamae
           nil
         end
 
+        def validate_element_attributes
+          @resource.class.defined_attributes.each_pair do |name, options|
+            next unless options[:element]
+
+            sname = name.to_s
+            next unless attributes.has_key?(sname)
+
+            attributes[sname].each_with_index do |element, index|
+              validate_element(options[:element], element, "#{sname}[#{index}]")
+            end
+          end
+        end
+
+        def validate_element(element_class, element, label)
+          unless element.is_a?(::Hash)
+            raise ::MItamae::Resource::InvalidTypeError, "#{label} should be Hash."
+          end
+
+          element.each_key do |key|
+            unless element_class.defined_attributes.has_key?(key.to_sym)
+              raise ::MItamae::Resource::InvalidTypeError, "'#{label}.#{key}' is not a valid attribute."
+            end
+          end
+
+          element_class.defined_attributes.each_pair do |key, details|
+            skey = key.to_s
+
+            unless element.has_key?(skey)
+              if details[:required]
+                raise ::MItamae::Resource::AttributeMissingError, "'#{label}.#{skey}' attribute is required but it is not set."
+              end
+              next
+            end
+
+            valid_type = [details[:type]].flatten.any? do |type|
+              element[skey].is_a?(type)
+            end
+            unless valid_type
+              raise ::MItamae::Resource::InvalidTypeError, "#{label}.#{skey} attribute should be #{details[:type]}."
+            end
+          end
+        end
+
         class RenderContext
+          Repo = Struct.new(:uri, :suite, :components, :options, :source)
+
           def initialize(resource)
             @resource = resource
             @entry    = []
@@ -85,28 +132,26 @@ module ::MItamae
             url_padding = 0
             suite_padding = 0
 
-            @resource.entry.each do |repo|
-              if repo.source
+            repos = []
+
+            @resource.entry.each do |entry|
+              if entry.source
                 deb_padding = 7
               end
 
-              if repo.mirror_uri.kind_of?(String) and repo.mirror_uri.match(/^(?:file|https?):\/\//)
-                repo.uri = repo.mirror_uri
+              if entry.mirror_uri.kind_of?(String) and entry.mirror_uri.match(/^(?:file|https?):\/\//)
+                uri = entry.mirror_uri
               else
-                repo.uri = repo.default_uri
+                uri = entry.default_uri
               end
 
-              repo.uri = repo.uri.gsub(/###platform_distrib###/, @platform[:distrib])
-              repo.uri = repo.uri.gsub(/###platform_release###/, @platform[:release])
-              repo.uri = repo.uri.gsub(/###platform_codename###/, @platform[:codename])
-              repo.uri = repo.uri.gsub(/###platform_major_version###/, @platform[:major_version])
-              repo.uri = repo.uri.gsub(/###platform_minor_version###/, @platform[:minor_version])
-
-              repo.suite = repo.suite.gsub(/###platform_distrib###/, @platform[:distrib])
-              repo.suite = repo.suite.gsub(/###platform_release###/, @platform[:release])
-              repo.suite = repo.suite.gsub(/###platform_codename###/, @platform[:codename])
-              repo.suite = repo.suite.gsub(/###platform_major_version###/, @platform[:major_version])
-              repo.suite = repo.suite.gsub(/###platform_minor_version###/, @platform[:minor_version])
+              repo = Repo.new(
+                expand_platform(uri),
+                expand_platform(entry.suite),
+                entry.components,
+                entry.options,
+                entry.source
+              )
 
               if url_padding < repo.uri.length
                 url_padding = repo.uri.length
@@ -115,12 +160,14 @@ module ::MItamae
               if suite_padding < repo.suite.length
                 suite_padding = repo.suite.length
               end
+
+              repos << repo
             end
 
             deb_padding += 1
             url_padding += 1
 
-            @resource.entry.each do |repo|
+            repos.each do |repo|
               options = ''
               if repo.options
                 options = "[#{repo.options}] "
@@ -166,6 +213,17 @@ module ::MItamae
             end
 
             return content
+          end
+
+          private
+
+          def expand_platform(value)
+            value = value.gsub(/###platform_distrib###/, @platform[:distrib])
+            value = value.gsub(/###platform_release###/, @platform[:release])
+            value = value.gsub(/###platform_codename###/, @platform[:codename])
+            value = value.gsub(/###platform_major_version###/, @platform[:major_version])
+            value = value.gsub(/###platform_minor_version###/, @platform[:minor_version])
+            value
           end
         end
       end

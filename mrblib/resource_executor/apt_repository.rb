@@ -52,7 +52,7 @@ module ::MItamae
           element_class.defined_attributes.each_pair do |key, details|
             skey = key.to_s
 
-            unless element.has_key?(skey)
+            if element[skey].nil?
               if details[:required]
                 raise ::MItamae::Resource::AttributeMissingError, "'#{label}.#{skey}' attribute is required but it is not set."
               end
@@ -133,7 +133,7 @@ module ::MItamae
                 validate_uri(expand_platform(entry.uri)),
                 expand_platform(entry.suite),
                 entry.components,
-                entry.options,
+                entry_options(entry),
                 entry.source
               )
             end
@@ -170,6 +170,34 @@ module ::MItamae
             uri
           end
 
+          # Collect the options set on the entry as [option, values] pairs.
+          def entry_options(entry)
+            options = []
+            ::MItamae::Plugin::Resource::AptRepository::Entry::OPTIONS.each_pair do |name, option|
+              value = entry[name.to_s]
+              next if value.nil?
+
+              values = [value].flatten.map do |v|
+                case v
+                when true  then 'yes'
+                when false then 'no'
+                else v.to_s
+                end
+              end
+              values.each do |v|
+                unless v.match(/\A[^\s,\[\]]+\z/)
+                  raise ArgumentError, "Invalid #{name} value: #{v.inspect}"
+                end
+              end
+              if values.empty?
+                raise ArgumentError, "Empty #{name} value"
+              end
+
+              options << [option, values]
+            end
+            options
+          end
+
           def render_one_line(repos)
             deb_padding = 3
             url_padding = 0
@@ -195,8 +223,8 @@ module ::MItamae
             content = ''
             repos.each do |repo|
               options = ''
-              if repo.options
-                options = "[#{repo.options}] "
+              unless repo.options.empty?
+                options = "[#{repo.options.map { |option, values| "#{option[:key]}=#{values.join(',')}" }.join(' ')}] "
               end
 
               components = ''

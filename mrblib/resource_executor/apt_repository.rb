@@ -129,14 +129,8 @@ module ::MItamae
           def render_file
             repos = []
             @resource.entry.each do |entry|
-              if entry.mirror_uri.kind_of?(String) and entry.mirror_uri.match(/^(?:file|https?):\/\//)
-                uri = entry.mirror_uri
-              else
-                uri = entry.default_uri
-              end
-
               repos << Repo.new(
-                expand_platform(uri),
+                validate_uri(expand_platform(entry.uri)),
                 expand_platform(entry.suite),
                 entry.components,
                 entry.options,
@@ -165,6 +159,16 @@ module ::MItamae
           end
 
           private
+
+          # scheme ":" followed by RFC 3986 characters, e.g. http://, mirror+file:/, cdrom:[label]/
+          URI_PATTERN = %r{\A[a-z][a-z0-9+.-]*:[A-Za-z0-9\-._~:/?#\[\]@!$&'()*+,;=%]+\z}
+
+          def validate_uri(uri)
+            unless uri.match(URI_PATTERN)
+              raise ArgumentError, "Invalid uri: #{uri.inspect}"
+            end
+            uri
+          end
 
           def render_one_line(repos)
             deb_padding = 3

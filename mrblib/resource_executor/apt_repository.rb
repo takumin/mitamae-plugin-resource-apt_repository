@@ -138,7 +138,11 @@ module ::MItamae
               )
             end
 
-            entries = render_one_line(repos)
+            if @resource.path.end_with?('.sources')
+              entries = render_deb822(repos)
+            else
+              entries = render_one_line(repos)
+            end
 
             content = ''
             case @resource.header
@@ -245,6 +249,36 @@ module ::MItamae
             end
 
             content
+          end
+
+          def render_deb822(repos)
+            # Entries that differ only in suite share one stanza.
+            stanzas = []
+            repos.each do |repo|
+              fields = [
+                ['Types', repo.source ? 'deb deb-src' : 'deb'],
+                ['URIs', repo.uri],
+              ]
+              if repo.components
+                fields << ['Components', repo.components.join(' ')]
+              end
+              repo.options.each do |option, values|
+                fields << [option[:field], values.join(' ')]
+              end
+
+              stanza = stanzas.find { |s| s[:fields] == fields }
+              if stanza
+                stanza[:suites] << repo.suite unless stanza[:suites].include?(repo.suite)
+              else
+                stanzas << { fields: fields, suites: [repo.suite] }
+              end
+            end
+
+            stanzas.map { |stanza|
+              fields = stanza[:fields].dup
+              fields.insert(2, ['Suites', stanza[:suites].join(' ')])
+              fields.map { |name, value| "#{name}: #{value}\n" }.join
+            }.join("\n")
           end
 
           def expand_platform(value)

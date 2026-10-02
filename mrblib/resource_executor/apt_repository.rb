@@ -73,7 +73,6 @@ module ::MItamae
 
           def initialize(resource)
             @resource = resource
-            @entry    = []
             @platform = {}
 
             if ::File.exist?('/etc/os-release')
@@ -128,72 +127,24 @@ module ::MItamae
           end
 
           def render_file
-            deb_padding = 3
-            url_padding = 0
-            suite_padding = 0
-
             repos = []
-
             @resource.entry.each do |entry|
-              if entry.source
-                deb_padding = 7
-              end
-
               if entry.mirror_uri.kind_of?(String) and entry.mirror_uri.match(/^(?:file|https?):\/\//)
                 uri = entry.mirror_uri
               else
                 uri = entry.default_uri
               end
 
-              repo = Repo.new(
+              repos << Repo.new(
                 expand_platform(uri),
                 expand_platform(entry.suite),
                 entry.components,
                 entry.options,
                 entry.source
               )
-
-              if url_padding < repo.uri.length
-                url_padding = repo.uri.length
-              end
-
-              if suite_padding < repo.suite.length
-                suite_padding = repo.suite.length
-              end
-
-              repos << repo
             end
 
-            deb_padding += 1
-            url_padding += 1
-
-            repos.each do |repo|
-              options = ''
-              if repo.options
-                options = "[#{repo.options}] "
-              end
-
-              components = ''
-              if repo.components
-                components = " #{repo.components.join(' ')}"
-              end
-
-              deb = 'deb'.ljust(deb_padding)
-              deb << options
-              deb << repo.uri.ljust(url_padding)
-              deb << repo.suite.ljust(suite_padding)
-              deb << components
-              @entry << deb
-
-              if repo.source
-                deb = 'deb-src'.ljust(deb_padding)
-                deb << options
-                deb << repo.uri.ljust(url_padding)
-                deb << repo.suite.ljust(suite_padding)
-                deb << components
-                @entry << deb
-              end
-            end
+            entries = render_one_line(repos)
 
             content = ''
             case @resource.header
@@ -202,9 +153,7 @@ module ::MItamae
             when Array
               content << @resource.header.join("\n") + "\n"
             end
-            @entry.each do |repo|
-              content << "#{repo}\n"
-            end
+            content << entries
             case @resource.footer
             when String
               content << @resource.footer + "\n"
@@ -216,6 +165,55 @@ module ::MItamae
           end
 
           private
+
+          def render_one_line(repos)
+            deb_padding = 3
+            url_padding = 0
+            suite_padding = 0
+
+            repos.each do |repo|
+              if repo.source
+                deb_padding = 7
+              end
+
+              if url_padding < repo.uri.length
+                url_padding = repo.uri.length
+              end
+
+              if suite_padding < repo.suite.length
+                suite_padding = repo.suite.length
+              end
+            end
+
+            deb_padding += 1
+            url_padding += 1
+
+            content = ''
+            repos.each do |repo|
+              options = ''
+              if repo.options
+                options = "[#{repo.options}] "
+              end
+
+              components = ''
+              if repo.components
+                components = " #{repo.components.join(' ')}"
+              end
+
+              types = ['deb']
+              types << 'deb-src' if repo.source
+              types.each do |type|
+                deb = type.ljust(deb_padding)
+                deb << options
+                deb << repo.uri.ljust(url_padding)
+                deb << repo.suite.ljust(suite_padding)
+                deb << components
+                content << "#{deb}\n"
+              end
+            end
+
+            content
+          end
 
           def expand_platform(value)
             value = value.gsub(/###platform_distrib###/, @platform[:distrib])
